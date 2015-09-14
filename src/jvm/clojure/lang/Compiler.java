@@ -133,12 +133,10 @@ public class Compiler implements Opcodes {
 
     private static final int MAX_POSITIONAL_ARITY = 20;
     private static final Type OBJECT_TYPE;
-    private static final Type KEYWORD_TYPE = Type.getType(Keyword.class);
     private static final Type VAR_TYPE = Type.getType(Var.class);
     private static final Type SYMBOL_TYPE = Type.getType(Symbol.class);
 //private static final Type NUM_TYPE = Type.getType(Num.class);
     private static final Type IFN_TYPE = Type.getType(IFn.class);
-    private static final Type AFUNCTION_TYPE = Type.getType(AFunction.class);
     private static final Type RT_TYPE = Type.getType(RT.class);
     private static final Type NUMBERS_TYPE = Type.getType(Numbers.class);
     final static Type CLASS_TYPE = Type.getType(Class.class);
@@ -415,19 +413,6 @@ public class Compiler implements Opcodes {
             this.isDynamic = isDynamic;
             this.shadowsCoreMapping = shadowsCoreMapping;
             this.initProvided = initProvided;
-        }
-
-        private boolean includesExplicitMetadata(MapExpr expr) {
-            for (int i = 0; i < expr.keyvals.count(); i += 2) {
-                Keyword k = ((KeywordExpr) expr.keyvals.nth(i)).k;
-                if ((k != RT.FILE_KEY)
-                        && (k != RT.DECLARED_KEY)
-                        && (k != RT.LINE_KEY)
-                        && (k != RT.COLUMN_KEY)) {
-                    return true;
-                }
-            }
-            return false;
         }
 
         public Object eval() {
@@ -3521,7 +3506,6 @@ public class Compiler implements Opcodes {
                 this.tag = tag;
             } else if (fexpr instanceof VarExpr) {
                 Var v = ((VarExpr) fexpr).var;
-                Object arglists = RT.get(RT.meta(v), arglistsKey);
                 Object sigTag = sigTag(args.count(), v);
                 this.tag = sigTag == null ? ((VarExpr) fexpr).tag : sigTag;
             } else {
@@ -3727,7 +3711,6 @@ public class Compiler implements Opcodes {
         //if there is a variadic overload (there can only be one) it is stored here
         FnMethod variadicMethod = null;
         IPersistentCollection methods;
-        private boolean hasPrimSigs;
         private boolean hasMeta;
         private boolean hasEnclosingMethod;
         //	String superName = null;
@@ -3901,7 +3884,6 @@ public class Compiler implements Opcodes {
             } finally {
                 Var.popThreadBindings();
             }
-            fn.hasPrimSigs = prims.size() > 0;
             IPersistentMap fmeta = RT.meta(origForm);
             if (fmeta != null) {
                 fmeta = fmeta.without(RT.LINE_KEY).without(RT.COLUMN_KEY).without(RT.FILE_KEY).without(retkey);
@@ -4054,15 +4036,6 @@ public class Compiler implements Opcodes {
             return constantsID;
         }
 
-        final static Method kwintern = Method.getMethod("clojure.lang.Keyword intern(String, String)");
-        final static Method symintern = Method.getMethod("clojure.lang.Symbol intern(String)");
-        final static Method varintern
-                = Method.getMethod("clojure.lang.Var intern(clojure.lang.Symbol, clojure.lang.Symbol)");
-
-        final static Type DYNAMIC_CLASSLOADER_TYPE = Type.getType(DynamicClassLoader.class);
-        final static Method getClassMethod = Method.getMethod("Class getClass()");
-        final static Method getClassLoaderMethod = Method.getMethod("ClassLoader getClassLoader()");
-        final static Method getConstantsMethod = Method.getMethod("Object[] getConstants(int)");
         final static Method readStringMethod = Method.getMethod("Object readString(String)");
 
         final static Type ILOOKUP_SITE_TYPE = Type.getType(ILookupSite.class);
@@ -4114,8 +4087,6 @@ public class Compiler implements Opcodes {
             String source = (String) SOURCE.deref();
             int lineBefore = (Integer) LINE_BEFORE.deref();
             int lineAfter = (Integer) LINE_AFTER.deref() + 1;
-            int columnBefore = (Integer) COLUMN_BEFORE.deref();
-            int columnAfter = (Integer) COLUMN_AFTER.deref() + 1;
 
             if (source != null && SOURCE_PATH.deref() != null) {
                 //cv.visitSource(source, null);
@@ -7750,7 +7721,6 @@ public class Compiler implements Opcodes {
         Class retClass;
         Class[] exclasses;
 
-        static Symbol dummyThis = Symbol.intern(null, "dummy_this_dlskjsdfower");
         private IPersistentVector parms;
 
         public NewInstanceMethod(ObjExpr objx, ObjMethod parent) {
@@ -7806,7 +7776,7 @@ public class Compiler implements Opcodes {
 
                 //register 'this' as local 0
                 if (thisName != null) {
-                    registerLocal((thisName == null) ? dummyThis : thisName, thistag, null, false);
+                    registerLocal(thisName, thistag, null, false);
                 } else {
                     getAndIncLocalNum();
                 }
@@ -7911,18 +7881,6 @@ public class Compiler implements Opcodes {
                 Map.Entry e = (Map.Entry) o;
                 java.lang.reflect.Method m = (java.lang.reflect.Method) e.getValue();
                 if (name.equals(m.getName()) && m.getParameterTypes().length == arity) {
-                    ret.put(e.getKey(), e.getValue());
-                }
-            }
-            return ret;
-        }
-
-        private static Map findMethodsWithName(String name, Map mm) {
-            Map ret = new HashMap();
-            for (Object o : mm.entrySet()) {
-                Map.Entry e = (Map.Entry) o;
-                java.lang.reflect.Method m = (java.lang.reflect.Method) e.getValue();
-                if (name.equals(m.getName())) {
                     ret.put(e.getKey(), e.getValue());
                 }
             }
@@ -8324,7 +8282,6 @@ public class Compiler implements Opcodes {
                 Object exprForm = args.nth(0);
                 int shift = ((Number) args.nth(1)).intValue();
                 int mask = ((Number) args.nth(2)).intValue();
-                Object defaultForm = args.nth(3);
                 Map caseMap = (Map) args.nth(4);
                 Keyword switchType = ((Keyword) args.nth(5));
                 Keyword testType = ((Keyword) args.nth(6));
