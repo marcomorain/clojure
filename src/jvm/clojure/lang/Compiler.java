@@ -4237,28 +4237,31 @@ static public class ObjExpr implements Expr{
 //		         superName != null ? superName :
 //		         (isVariadic() ? "clojure/lang/RestFn" : "clojure/lang/AFunction"), null);
 		String source = (String) SOURCE.deref();
+    String sourcePath = (String) SOURCE_PATH.deref();
 		int lineBefore = (Integer) LINE_BEFORE.deref();
 		int lineAfter = (Integer) LINE_AFTER.deref() + 1;
 		int columnBefore = (Integer) COLUMN_BEFORE.deref();
 		int columnAfter = (Integer) COLUMN_AFTER.deref() + 1;
 
-		if(source != null && SOURCE_PATH.deref() != null)
+		if(source != null && sourcePath != null)
 			{
-			//cv.visitSource(source, null);
-			String smap = "SMAP\n" +
-			              ((source.lastIndexOf('.') > 0) ?
+        String smap = new StringBuilder(128 + source.length())
+         .append("SMAP\n")
+         .append((source.lastIndexOf('.') > 0) ?
 			               source.substring(0, source.lastIndexOf('.'))
 			                :source)
-			                       //                      : simpleName)
-			              + ".java\n" +
-			              "Clojure\n" +
-			              "*S Clojure\n" +
-			              "*F\n" +
-			              "+ 1 " + source + "\n" +
-			              (String) SOURCE_PATH.deref() + "\n" +
-			              "*L\n" +
-			              String.format("%d#1,%d:%d\n", lineBefore, lineAfter - lineBefore, lineBefore) +
-			              "*E";
+         .append(".java\nClojure\n*S Clojure\n*F\n+ 1 ")
+         .append(source)
+         .append("\n")
+         .append((String) SOURCE_PATH.deref())
+         .append("\n*L\n")
+         .append(lineBefore)
+         .append("#1,")
+         .append(lineAfter - lineBefore)
+         .append(':')
+         .append(lineBefore)
+         .append("\n*E")
+         .toString();
 			cv.visitSource(source, smap);
 			}
 		addAnnotation(cv, classMeta);
